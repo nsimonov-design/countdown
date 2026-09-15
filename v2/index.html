@@ -1,0 +1,238 @@
+<title>Обратный отсчёт</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=Golos+Text:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Тёмная тема — основная: всё происходит в полночь */
+  :root{
+    --ground:#0B0E1A;
+    --ink:#EDE9E0;
+    --ink-dim:#8E93A8;
+    --accent:#E0A75C;
+    --accent-soft:rgba(224,167,92,.14);
+    --line:#232A40;
+    --glow:radial-gradient(120% 80% at 50% -10%, #1B2440 0%, rgba(11,14,26,0) 62%);
+
+    --display:"Unbounded","Trebuchet MS",sans-serif;
+    --body:"Golos Text","Helvetica Neue",Arial,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --ground:#EEF0F6;
+      --ink:#151A2B;
+      --ink-dim:#5D6479;
+      --accent:#9C5E0C;
+      --accent-soft:rgba(156,94,12,.10);
+      --line:#D6DAE6;
+      --glow:radial-gradient(120% 80% at 50% -10%, #FFFFFF 0%, rgba(238,240,246,0) 60%);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#EEF0F6;
+    --ink:#151A2B;
+    --ink-dim:#5D6479;
+    --accent:#9C5E0C;
+    --accent-soft:rgba(156,94,12,.10);
+    --line:#D6DAE6;
+    --glow:radial-gradient(120% 80% at 50% -10%, #FFFFFF 0%, rgba(238,240,246,0) 60%);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--ground);
+    background-image:var(--glow);
+    background-repeat:no-repeat;
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:600px;
+    margin:0 auto;
+    padding-inline:20px;
+    padding-block:clamp(44px,10vw,88px) 64px;
+    display:flex;
+    flex-direction:column;
+    gap:40px;
+  }
+
+  .eyebrow{
+    font-family:var(--display);
+    font-size:11px;
+    font-weight:400;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin:0;
+  }
+
+  /* Главный счётчик: дни доминируют, часы идут строкой ниже */
+  .count{display:flex;flex-direction:column}
+  .days{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .days b{
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:clamp(80px,26vw,156px);
+    line-height:.86;
+    letter-spacing:-.04em;
+    font-variant-numeric:tabular-nums;
+    color:var(--accent);
+  }
+  .days span{
+    font-family:var(--display);
+    font-size:clamp(15px,4vw,19px);
+    color:var(--ink-dim);
+  }
+  .hms{
+    font-family:var(--mono);
+    font-weight:500;
+    font-size:clamp(22px,6.5vw,30px);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.04em;
+    margin-top:14px;
+  }
+  .hms small{
+    font-family:var(--body);
+    font-size:13px;
+    letter-spacing:0;
+    color:var(--ink-dim);
+    margin-left:10px;
+  }
+
+  .arrived{
+    font-family:var(--display);
+    font-size:clamp(24px,6vw,32px);
+    color:var(--accent);
+    margin:0;
+  }
+
+  /* Ближайшее событие — выделено заливкой, а не очередной карточкой-рамкой */
+  .next{
+    background:var(--accent-soft);
+    border-left:2px solid var(--accent);
+    padding:16px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .label{
+    font-family:var(--display);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .next-left{
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:clamp(20px,5.5vw,25px);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .foot{
+    color:var(--ink-dim);
+    font-size:13px;
+    margin:0;
+    border-top:1px solid var(--line);
+    padding-top:18px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Обратный отсчёт</p>
+
+  <div class="count" id="count">
+    <div class="days"><b id="days">—</b><span id="days-word">дней до основного события</span></div>
+    <div class="hms"><span id="hms">--:--:--</span><small>часы · минуты · секунды</small></div>
+  </div>
+  <p class="arrived" id="arrived" hidden>Событие наступило</p>
+
+  <div class="next" id="next">
+    <span class="label">До следующего события</span>
+    <span class="next-left" id="next-left">—</span>
+  </div>
+
+  <p class="foot">Время московское.</p>
+</div>
+
+<script>
+  var EVENT = new Date('2026-09-25T00:00:00+03:00');
+  var STEPS = [
+    new Date('2026-09-20T00:00:00+03:00'),
+    new Date('2026-09-22T00:00:00+03:00'),
+    new Date('2026-09-23T00:00:00+03:00'),
+    new Date('2026-09-25T00:00:00+03:00')
+  ];
+
+  // Telegram держит заглушку загрузки, пока мини-приложение не отчитается о готовности
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if(tg){
+    try{
+      tg.ready();
+      tg.expand();
+      if(tg.colorScheme){
+        document.documentElement.setAttribute('data-theme', tg.colorScheme);
+      }
+    }catch(e){ /* вне Telegram страница работает как обычная */ }
+  }
+
+  function plural(n, forms){
+    var a = Math.abs(n) % 100, b = a % 10;
+    if(a > 10 && a < 20) return forms[2];
+    if(b > 1 && b < 5) return forms[1];
+    if(b === 1) return forms[0];
+    return forms[2];
+  }
+  function pad(n){ return String(n).padStart(2, '0'); }
+
+  function shortLeft(ms){
+    if(ms <= 0) return 'вот-вот';
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    if(d) return d + ' ' + plural(d, ['день','дня','дней']) + ' ' + h + ' ' + plural(h, ['час','часа','часов']);
+    if(h) return h + ' ' + plural(h, ['час','часа','часов']) + ' ' + m + ' ' + plural(m, ['минуту','минуты','минут']);
+    return m + ' ' + plural(m, ['минуту','минуты','минут']);
+  }
+
+  function render(){
+    var now = Date.now();
+    var left = EVENT.getTime() - now;
+
+    if(left > 0){
+      var s = Math.floor(left / 1000);
+      var d = Math.floor(s / 86400);
+      document.getElementById('days').textContent = d;
+      document.getElementById('days-word').textContent =
+        plural(d, ['день','дня','дней']) + ' до основного события';
+      document.getElementById('hms').textContent =
+        pad(Math.floor(s % 86400 / 3600)) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60);
+    } else {
+      document.getElementById('count').hidden = true;
+      document.getElementById('arrived').hidden = false;
+    }
+
+    var upcoming = null;
+    for(var i = 0; i < STEPS.length; i++){
+      if(STEPS[i].getTime() > now){ upcoming = STEPS[i]; break; }
+    }
+
+    var nextBox = document.getElementById('next');
+    if(upcoming === null){
+      nextBox.hidden = true;
+    } else {
+      document.getElementById('next-left').textContent = shortLeft(upcoming.getTime() - now);
+    }
+  }
+
+  render();
+  setInterval(render, 1000);
+</script>
